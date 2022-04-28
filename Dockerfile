@@ -1,14 +1,12 @@
-FROM lukemathwalker/cargo-chef:latest-rust-1.60.0 as chef
+FROM rust:1.60 as builder
+
 WORKDIR /app
-RUN apt update && apt install lld clang -y
+RUN cargo install --locked --branch master \
+--git https://github.com/eeff/cargo-build-deps
 
-FROM chef as planner 
-COPY . .
-RUN cargo chef prepare --recipe-path recipe.json
+COPY Cargo.toml Cargo.lock ./
+RUN cargo build-deps --release
 
-FROM chef as builder
-COPY --from=planner /app/recipe.json recipe.json
-RUN cargo chef cook --release --recipe-path recipe.json
 COPY . .
 ENV SQLX_OFFLINE true
 RUN cargo build --release --bin zero2prod
@@ -17,7 +15,7 @@ RUN cargo build --release --bin zero2prod
 FROM debian:bullseye-slim AS runtime
 WORKDIR /app
 RUN apt-get update -y \
-&& apt-get install -y no-install-recommends openssl ca-certificates \
+&& apt-get install -y --no-install-recommends openssl ca-certificates \
 #cleanup
 && apt-get autoremove -y \
 && apt-get clean -y \
